@@ -1,0 +1,28 @@
+# NeuroScribe backend dependencies.
+#
+# Tested with the versions below (CPU-only torch build) on Python 3.11.
+# Install with:
+#   pip install -r requirements.txt
+# If you hit an "externally managed environment" error on Debian/Ubuntu:
+#   pip install -r requirements.txt --break-system-packages
+#
+# For a CPU-only torch wheel (smaller download) you can instead run:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# before installing the rest of this file.
+
+torch>=2.2
+
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pydantic>=2.6
+
+boto3>=1.34
+moto>=5.0
+
+numpy>=1.26
+Pillow>=10.2
+
+pytest>=8.0
+httpx>=0.27
+requests>=2.31
