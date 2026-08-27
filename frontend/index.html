@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NeuroScribe — Demo UI</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-border: #2a3346;
+    --text: #e7ecf5;
+    --muted: #9aa7bd;
+    --accent: #5fa8ff;
+    --danger: #ff6b6b;
+    --ok: #58d68d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 24px 32px 8px;
+    border-bottom: 1px solid var(--panel-border);
+  }
+  header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+  header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 32px 64px;
+  }
+  .disclaimer {
+    background: #2a1f14;
+    border: 1px solid #6b4a1f;
+    color: #f2c98a;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  label { font-size: 0.85rem; color: var(--muted); display: block; margin-bottom: 6px; }
+  input[type="text"], select {
+    background: #0d1220;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  input[type="file"] { color: var(--text); font-size: 0.85rem; }
+  button {
+    background: var(--accent);
+    color: #04101f;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status { font-size: 0.85rem; margin-top: 10px; }
+  .status.error { color: var(--danger); }
+  .status.ok { color: var(--ok); }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+  figure {
+    margin: 0;
+    background: #0d1220;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  figure img {
+    width: 100%;
+    max-width: 256px;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    background: #000;
+  }
+  figcaption { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+  .meta { font-size: 0.85rem; color: var(--muted); margin-top: 16px; line-height: 1.6; }
+  .meta code { color: var(--accent); }
+  footer { text-align: center; color: var(--muted); font-size: 0.75rem; padding: 24px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>NeuroScribe</h1>
+  <p>Multimodal medical-imaging segmentation &amp; interpretability pipeline — educational demo</p>
+</header>
+<main>
+  <div class="disclaimer">
+    <strong>Not a medical device.</strong> This entire project — model, training data, and this
+    UI — operates only on procedurally generated synthetic images meant to loosely resemble a
+    2D scan slice with lesion-like blobs. No real patient data or real MRI/CT scans are used
+    anywhere. This is a portfolio / educational demo, not a clinical or diagnostic tool, and must
+    never be used to make real medical decisions.
+  </div>
+  <div id="root"></div>
+</main>
+<footer>
+  NeuroScribe frontend — a static single-file React app (loaded via CDN, no build step required).
+</footer>
+
+<!-- React + ReactDOM UMD builds from a CDN. This is the one piece of this frontend that requires
+     internet access to load; everything else in this file is plain, self-contained HTML/CSS/JS.
+     No JSX/Babel is used — all UI is built with React.createElement so no compile step is needed. -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+<script>
+const { useState, useCallback, createElement: h } = React;
+
+const DEFAULT_BACKEND_URL = "http://localhost:8000";
+
+function App() {
+  const [backendUrl, setBackendUrl] = useState(DEFAULT_BACKEND_URL);
+  const [saliencyMethod, setSaliencyMethod] = useState("grad_cam");
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const onFileChange = useCallback((e) => {
+    const f = e.target.files && e.target.files[0];
+    setFile(f || null);
+    setResult(null);
+    setError(null);
+    if (f) {
+      setPreviewUrl(URL.createObjectURL(f));
+    } else {
+      setPreviewUrl(null);
+    }
+  }, []);
+
+  const onSubmit = useCallback(async () => {
+    if (!file) {
+      setError("Choose an image file first.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = `${backendUrl.replace(/\/$/, "")}/segment?saliency_method=${encodeURIComponent(saliencyMethod)}`;
+      const resp = await fetch(url, { method: "POST", body: formData });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`Backend returned ${resp.status}: ${text}`);
+      }
+      const data = await resp.json();
+      setResult(data);
+    } catch (err) {
+      setError(
+        `${err.message || err}. Is the backend running at ${backendUrl}? ` +
+        `Start it with: cd backend && uvicorn app.main:app --reload`
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [file, backendUrl, saliencyMethod]);
+
+  const children = [];
+
+  // Connection settings panel
+  children.push(
+    h("div", { className: "panel", key: "settings" }, [
+      h("div", { className: "row", key: "r1" }, [
+        h("div", { key: "url" }, [
+          h("label", { key: "l" }, "Backend URL"),
+          h("input", {
+            type: "text",
+            value: backendUrl,
+            onChange: (e) => setBackendUrl(e.target.value),
+            style: { width: "260px" },
+            key: "i",
+          }),
+        ]),
+        h("div", { key: "method" }, [
+          h("label", { key: "l" }, "Saliency method"),
+          h(
+            "select",
+            {
+              value: saliencyMethod,
+              onChange: (e) => setSaliencyMethod(e.target.value),
+              key: "s",
+            },
+            [
+              h("option", { value: "grad_cam", key: "g" }, "Grad-CAM-style (bottleneck activations)"),
+              h("option", { value: "vanilla_gradient", key: "v" }, "Vanilla input-gradient"),
+            ]
+          ),
+        ]),
+      ]),
+    ])
+  );
+
+  // Upload panel
+  children.push(
+    h("div", { className: "panel", key: "upload" }, [
+      h("label", { key: "l" }, "Upload an image (any image works — it will be resized to 64x64 grayscale)"),
+      h("div", { className: "row", key: "row" }, [
+        h("input", { type: "file", accept: "image/*", onChange: onFileChange, key: "f" }),
+        h(
+          "button",
+          { onClick: onSubmit, disabled: loading || !file, key: "b" },
+          loading ? "Segmenting..." : "Run segmentation"
+        ),
+      ]),
+      previewUrl
+        ? h("div", { style: { marginTop: "12px" }, key: "preview" }, [
+            h("figure", { key: "fig" }, [
+              h("img", { src: previewUrl, alt: "upload preview", key: "img" }),
+              h("figcaption", { key: "cap" }, "Selected file (before resizing)"),
+            ]),
+          ])
+        : null,
+      error ? h("div", { className: "status error", key: "err" }, error) : null,
+    ])
+  );
+
+  // Results panel
+  if (result) {
+    children.push(
+      h("div", { className: "panel", key: "results" }, [
+        h("div", { className: "status ok", key: "ok" }, "Segmentation complete."),
+        h("div", { className: "results-grid", key: "grid" }, [
+          h("figure", { key: "orig" }, [
+            h("img", { src: `data:image/png;base64,${result.original_png_base64}`, key: "img" }),
+            h("figcaption", { key: "cap" }, "Original (resized to 64x64 grayscale)"),
+          ]),
+          h("figure", { key: "mask" }, [
+            h("img", { src: `data:image/png;base64,${result.mask_overlay_png_base64}`, key: "img" }),
+            h("figcaption", { key: "cap" }, "Segmentation mask overlay"),
+          ]),
+          h("figure", { key: "saliency" }, [
+            h("img", { src: `data:image/png;base64,${result.saliency_overlay_png_base64}`, key: "img" }),
+            h("figcaption", { key: "cap" }, `Saliency heatmap (${result.saliency_method})`),
+          ]),
+        ]),
+        h("div", { className: "meta", key: "meta" }, [
+          h("div", { key: "1" }, ["Predicted lesion fraction: ", h("code", { key: "c" }, result.predicted_lesion_fraction.toFixed(4))]),
+          h("div", { key: "2" }, ["Saliency method: ", h("code", { key: "c" }, result.saliency_method)]),
+          h("div", { key: "3", style: { marginTop: "8px", color: "#f2c98a" } }, result.disclaimer),
+        ]),
+      ])
+    );
+  }
+
+  return h("div", null, children);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
