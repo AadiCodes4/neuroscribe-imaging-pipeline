@@ -5,6 +5,8 @@ medical-imaging-*style* pipeline — synthetic data generation, a PyTorch
 U-Net segmentation model, gradient-based interpretability, a FastAPI
 backend, and a single-file React frontend.
 
+Video Demo: https://drive.google.com/file/d/1030bPW-F35IiUdXPA8f-A33M34ywdRkG/view?usp=sharing
+
 > **Not a medical device.** Every image this project trains on, predicts
 > on, or displays is procedurally generated synthetic data meant to loosely
 > resemble a 2D scan slice with lesion-like blobs. No real patient data or
